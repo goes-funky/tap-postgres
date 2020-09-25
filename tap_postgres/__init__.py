@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-statements,broad-except,unnecessary-lambda
-
 import datetime
 import pdb
 import json
@@ -686,6 +685,9 @@ def main_impl():
                    'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
                    'wal2json_message_format': args.config.get('wal2json_message_format')}
 
+    if "ssh_tunnel" in args.config and args.config["ssh_tunnel"]["enabled"] == True:
+        conn_config["ssh_tunnel"] = args.config["ssh_tunnel"]
+
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
 
@@ -702,6 +704,8 @@ def main_impl():
         do_sync(conn_config, args.properties, args.config.get('default_replication_method'), state)
     else:
         LOGGER.info("No properties were selected")
+
+    post_db.close()
 
 def main():
     try:

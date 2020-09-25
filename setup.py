@@ -12,7 +12,9 @@ setup(name='tap-postgres',
           'singer-python==5.3.1',
           'psycopg2==2.7.4',
           'strict-rfc3339==0.7',
-          'nose==1.3.7'
+          'nose==1.3.7',
+          'sshtunnel==0.1.5',
+          'paramiko==2.7.2'
       ],
       entry_points='''
           [console_scripts]
