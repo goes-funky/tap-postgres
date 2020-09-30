@@ -640,6 +640,18 @@ def any_logical_streams(streams, default_replication_method):
 
     return False
 
+def validate_connectivity(conn_config):
+    LOGGER.info("validating connectivity")
+    conn_config["connect_timeout"] = 10
+    with post_db.open_connection(conn_config) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute("SELECT 1")
+            one = cur.fetchone()
+            if one[0] != 1:
+                LOGGER.critical("did not connect successfully")
+                raise Exception("validate connectivity failed")
+            LOGGER.info("successfully connected")
+
 def do_sync(conn_config, catalog, default_replication_method, state):
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
@@ -688,24 +700,33 @@ def main_impl():
     if "ssh_tunnel" in args.config and args.config["ssh_tunnel"]["enabled"] == True:
         conn_config["ssh_tunnel"] = args.config["ssh_tunnel"]
 
+    use_ssl = False
     if args.config.get('ssl') == 'true':
+        LOGGER.info("require ssl")
+        use_ssl = True
         conn_config['sslmode'] = 'require'
 
     post_db.cursor_iter_size = int(args.config.get('itersize', '20000'))
 
     post_db.include_schemas_in_destination_stream_name = (args.config.get('include_schemas_in_destination_stream_name') == 'true')
 
-    post_db.get_ssl_status(conn_config)
+    try:
+        if use_ssl:
+            post_db.get_ssl_status(conn_config)
 
-    if args.discover:
-        do_discovery(conn_config)
-    elif args.properties:
-        state = args.state
-        do_sync(conn_config, args.properties, args.config.get('default_replication_method'), state)
-    else:
-        LOGGER.info("No properties were selected")
-
-    post_db.close()
+        if args.config.get("validate_only"):
+            validate_connectivity(conn_config)
+        elif args.discover:
+            do_discovery(conn_config)
+        elif args.properties:
+            state = args.state
+            do_sync(conn_config, args.properties, args.config.get('default_replication_method'), state)
+        else:
+            LOGGER.info("No properties were selected")
+    except Exception as e:
+        raise e
+    finally:
+        post_db.close()
 
 def main():
     try:

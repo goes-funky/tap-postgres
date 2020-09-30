@@ -5,6 +5,7 @@ import psycopg2
 import psycopg2.extras
 import singer
 from sshtunnel import SSHTunnelForwarder
+import sshtunnel
 from paramiko import RSAKey
 import io
 LOGGER = singer.get_logger()
@@ -50,15 +51,19 @@ def fully_qualified_table_name(schema, table):
     return '"{}"."{}"'.format(canonicalize_identifier(schema), canonicalize_identifier(table))
 
 def open_connection(conn_config, logical_replication=False):
+    connect_timeout = 30
+    if "connect_timeout" in conn_config:
+        connect_timeout = conn_config["connect_timeout"]
     cfg = {
         'host': conn_config['host'],
         'dbname': conn_config['dbname'],
         'user': conn_config['user'],
         'password': conn_config['password'],
         'port': conn_config['port'],
-        'connect_timeout': 30
+        'connect_timeout': connect_timeout
     }
 
+    print(cfg)
 
     if "ssh_tunnel" in conn_config and conn_config["ssh_tunnel"]["enabled"] == True:
         conn_config = open_tunnel(conn_config)
@@ -72,9 +77,7 @@ def open_connection(conn_config, logical_replication=False):
     if logical_replication:
         cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
 
-
     conn = psycopg2.connect(**cfg)
-
     return conn
 
 
@@ -87,6 +90,7 @@ def open_tunnel(conn_config):
     key = ssh_config["key"]
 
     key_file = io.StringIO(key)
+    sshtunnel.SSH_TIMEOUT = 5
 
     private_key_object = RSAKey.from_private_key(key_file)
 
@@ -251,3 +255,4 @@ def close():
     global ssh_tunnel
     if isinstance(ssh_tunnel, SSHTunnelForwarder):
         ssh_tunnel.close()
+        ssh_tunnel = None
