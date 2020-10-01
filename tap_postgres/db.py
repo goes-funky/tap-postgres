@@ -63,8 +63,6 @@ def open_connection(conn_config, logical_replication=False):
         'connect_timeout': connect_timeout
     }
 
-    print(cfg)
-
     if "ssh_tunnel" in conn_config and conn_config["ssh_tunnel"]["enabled"] == True:
         conn_config = open_tunnel(conn_config)
         cfg["host"] = conn_config["host"]
