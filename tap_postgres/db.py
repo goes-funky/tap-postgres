@@ -4,16 +4,10 @@ import math
 import psycopg2
 import psycopg2.extras
 import singer
-from sshtunnel import SSHTunnelForwarder
-import sshtunnel
-from paramiko import RSAKey
-import io
 LOGGER = singer.get_logger()
 
 cursor_iter_size = 20000
 include_schemas_in_destination_stream_name = False
-
-ssh_tunnel = None
 
 def get_ssl_status(conn_config):
     try:
@@ -63,12 +57,6 @@ def open_connection(conn_config, logical_replication=False):
         'connect_timeout': connect_timeout
     }
 
-    if "ssh_tunnel" in conn_config and conn_config["ssh_tunnel"]["enabled"] == True:
-        conn_config = open_tunnel(conn_config)
-        cfg["host"] = conn_config["host"]
-        cfg["port"] = conn_config["port"]
-
-
     if conn_config.get('sslmode'):
         cfg['sslmode'] = conn_config['sslmode']
 
@@ -77,42 +65,6 @@ def open_connection(conn_config, logical_replication=False):
 
     conn = psycopg2.connect(**cfg)
     return conn
-
-
-def open_tunnel(conn_config):
-    global ssh_tunnel
-    if isinstance(ssh_tunnel, SSHTunnelForwarder):
-        return apply_tunnel_config(conn_config)
-    singer.logger.log_info("ssh tunnel enabled, establish connection")
-    ssh_config = conn_config["ssh_tunnel"]
-    key = ssh_config["key"]
-
-    key_file = io.StringIO(key)
-    sshtunnel.SSH_TIMEOUT = 5
-
-    private_key_object = RSAKey.from_private_key(key_file)
-
-    ssh_tunnel = SSHTunnelForwarder(
-            (ssh_config["host"], int(ssh_config["port"])),
-            ssh_username=ssh_config["user"],
-            ssh_pkey=private_key_object,
-            remote_bind_address=(conn_config["host"], int(conn_config["port"]))
-    )
-    ssh_tunnel.start()
-    singer.logger.log_info("established tunnel at local port " + str(ssh_tunnel.local_bind_port))
-    conn_config = apply_tunnel_config(conn_config)
-    return conn_config
-
-
-def apply_tunnel_config(conn_config):
-    global ssh_tunnel
-    if not isinstance(ssh_tunnel, SSHTunnelForwarder):
-        raise Exception("ssh_tunnel not available")
-
-    conn_config["host"] = "127.0.0.1"
-    conn_config["port"] = ssh_tunnel.local_bind_port
-    return conn_config
-
 
 
 def prepare_columns_sql(c):
@@ -248,9 +200,3 @@ def numeric_max(precision, scale):
 
 def numeric_min(precision, scale):
     return -10 ** (precision - scale)
-
-def close():
-    global ssh_tunnel
-    if isinstance(ssh_tunnel, SSHTunnelForwarder):
-        ssh_tunnel.close()
-        ssh_tunnel = None

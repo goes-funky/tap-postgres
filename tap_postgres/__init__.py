@@ -697,9 +697,6 @@ def main_impl():
                    'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
                    'wal2json_message_format': args.config.get('wal2json_message_format')}
 
-    if "ssh_tunnel" in args.config and args.config["ssh_tunnel"]["enabled"] == True:
-        conn_config["ssh_tunnel"] = args.config["ssh_tunnel"]
-
     use_ssl = False
     if args.config.get('ssl') == 'true':
         LOGGER.info("require ssl")
@@ -725,8 +722,7 @@ def main_impl():
             LOGGER.info("No properties were selected")
     except Exception as e:
         raise e
-    finally:
-        post_db.close()
+
 
 def main():
     try:
