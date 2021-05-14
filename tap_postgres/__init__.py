@@ -414,6 +414,9 @@ def do_discovery(conn_config):
             WHERE datistemplate = false
               AND datname != 'rdsadmin'"""
 
+            if conn_config.get("dbname"):
+                conn_config["filter_dbs"] = conn_config.get("dbname")
+
             if conn_config.get('filter_dbs'):
                 sql = post_db.filter_dbs_sql_clause(sql, conn_config['filter_dbs'])
 
